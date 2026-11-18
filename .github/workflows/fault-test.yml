@@ -1,0 +1,45 @@
+name: Validate real RDS outage
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: terraform-infrastructure
+  cancel-in-progress: false
+env:
+  AWS_DEFAULT_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+jobs:
+  fault:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3==1.38.23
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+      - name: Stop only this lab RDS, generate real errors and verify alarm
+        run: python scripts/fault_test.py
+      - name: Always restart the lab database after the experiment
+        if: always()
+        run: |
+          STATUS=$(aws rds describe-db-instances --db-instance-identifier practica4-todo --query 'DBInstances[0].DBInstanceStatus' --output text)
+          if [ "$STATUS" = stopping ]; then aws rds wait db-instance-stopped --db-instance-identifier practica4-todo; STATUS=stopped; fi
+          if [ "$STATUS" = stopped ]; then aws rds start-db-instance --db-instance-identifier practica4-todo >/dev/null; fi
+          aws rds wait db-instance-available --db-instance-identifier practica4-todo
+      - name: Verify recovery
+        if: always()
+        run: |
+          HOST=$(aws ec2 describe-instances --filters Name=tag:Project,Values=practica4-todo Name=instance-state-name,Values=running --query 'Reservations[].Instances[].PublicIpAddress' --output text)
+          python scripts/smoke.py "http://$HOST:8000" --wait 180
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-outage-evidence
+          path: evidence/
