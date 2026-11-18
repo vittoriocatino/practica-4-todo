@@ -93,6 +93,12 @@ El bootstrap del bucket se hace una sola vez; futuras ejecuciones recuperan su
 estado de S3. La creación inicial del bucket es la única etapa con estado local
 transitorio. No se publica ningún tfstate ni plan como artifact o en Git. La
 configuración `prevent_destroy` protege el bucket frente a un borrado accidental.
+Si el bucket ya existe, Terraform lo consulta como data source y administra sólo
+sus configuraciones de cifrado, versionado y bloqueo de acceso público. Esto evita
+consultar metadatos de Object Lock que el SCP del Learner Lab prohíbe. En esta
+cuenta, el primer apply sí creó el bucket, pero falló al intentar esa lectura
+opcional; las ejecuciones siguientes reutilizan el bucket creado. No se modificó
+ninguna política del laboratorio ni se intentó habilitar Object Lock.
 El estado contiene valores sensibles, incluido el password generado por Terraform;
 por ello se cifra y no se adjunta al reporte ni se sube al repositorio.
 
