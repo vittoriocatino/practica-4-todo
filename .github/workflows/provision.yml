@@ -36,11 +36,15 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$STATE_BUCKET"
+          CREATE_BUCKET=true
           if aws s3api head-bucket --bucket "$STATE_BUCKET" 2>/dev/null; then
-            aws s3 cp "s3://$STATE_BUCKET/bootstrap/terraform.tfstate" terraform/bootstrap/terraform.tfstate --only-show-errors
+            CREATE_BUCKET=false
+            if aws s3api head-object --bucket "$STATE_BUCKET" --key bootstrap/terraform.tfstate >/dev/null 2>&1; then
+              aws s3 cp "s3://$STATE_BUCKET/bootstrap/terraform.tfstate" terraform/bootstrap/terraform.tfstate --only-show-errors
+            fi
           fi
           terraform -chdir=terraform/bootstrap init -input=false
-          terraform -chdir=terraform/bootstrap apply -auto-approve -input=false -var="aws_region=$AWS_DEFAULT_REGION" -var="state_bucket=$STATE_BUCKET"
+          terraform -chdir=terraform/bootstrap apply -auto-approve -input=false -var="aws_region=$AWS_DEFAULT_REGION" -var="state_bucket=$STATE_BUCKET" -var="create_state_bucket=$CREATE_BUCKET"
           aws s3 cp terraform/bootstrap/terraform.tfstate "s3://$STATE_BUCKET/bootstrap/terraform.tfstate" --only-show-errors
       - name: Generate unused public key for Terraform Key Pair
         run: |
