@@ -1,0 +1,9 @@
+{
+  "source_of_truth": "terraform/main.tf: aws_cloudwatch_metric_alarm resources",
+  "notification": "SNS topic practica4-todo-alerts; confirmed email subscription required",
+  "alarms": [
+    {"name":"practica4-todo-cpu-high","namespace":"AWS/EC2","metric":"CPUUtilization","statistic":"Average","period_seconds":60,"evaluation_periods":2,"datapoints_to_alarm":2,"threshold":80,"comparison":"GreaterThanOrEqualToThreshold","missing_data":"missing","unit":"Percent"},
+    {"name":"practica4-todo-database-errors","namespace":"TodoList","metric":"DatabaseErrors","statistic":"Sum","period_seconds":60,"evaluation_periods":1,"threshold":1,"comparison":"GreaterThanOrEqualToThreshold","missing_data":"notBreaching","unit":"Count"},
+    {"name":"practica4-todo-database-latency","namespace":"TodoList","metric":"DatabaseLatency","statistic":"Average","period_seconds":60,"evaluation_periods":2,"datapoints_to_alarm":2,"threshold":500,"comparison":"GreaterThanOrEqualToThreshold","missing_data":"notBreaching","unit":"Milliseconds"}
+  ]
+}

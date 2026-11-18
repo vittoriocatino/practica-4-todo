@@ -1,0 +1,44 @@
+#!/bin/bash
+set -euo pipefail
+exec > >(tee -a /var/log/todo-bootstrap.log) 2>&1
+dnf install -y python3 python3-pip git unzip
+id todo >/dev/null 2>&1 || useradd --system --home /opt/todo --shell /sbin/nologin todo
+install -d -o todo -g todo /opt/todo/releases
+git clone --depth 1 --branch '${git_ref}' '${repository_url}' /opt/todo/releases/bootstrap
+python3 -m venv /opt/todo/releases/bootstrap/.venv
+/opt/todo/releases/bootstrap/.venv/bin/pip install --no-cache-dir -r /opt/todo/releases/bootstrap/src/requirements.txt
+ln -s /opt/todo/releases/bootstrap /opt/todo/current
+install -d -m 0750 /etc/todo
+cat > /etc/todo/runtime.env <<'ENV'
+AWS_DEFAULT_REGION=${aws_region}
+AWS_REGION=${aws_region}
+APP_NAME=${app_name}
+DB_SECRET_ARN=${secret_arn}
+ENV
+printf 'APP_VERSION=bootstrap\n' > /etc/todo/version.env
+chmod 0640 /etc/todo/*.env
+cat > /etc/systemd/system/todo.service <<'UNIT'
+[Unit]
+Description=Vittorio Catino To-do API
+After=network-online.target
+Wants=network-online.target
+[Service]
+User=todo
+Group=todo
+WorkingDirectory=/opt/todo/current
+EnvironmentFile=/etc/todo/runtime.env
+EnvironmentFile=/etc/todo/version.env
+ExecStart=/opt/todo/current/.venv/bin/uvicorn src.main:app --host 0.0.0.0 --port 8000 --workers 1
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target
+UNIT
+chown -R todo:todo /opt/todo
+systemctl daemon-reload
+systemctl enable --now amazon-ssm-agent
+systemctl enable --now todo

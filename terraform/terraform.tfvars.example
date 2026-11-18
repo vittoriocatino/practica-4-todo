@@ -1,0 +1,4 @@
+aws_region     = "us-east-1"
+alert_email    = "vittorio.catino@iteso.mx"
+repository_url = "https://github.com/vittoriocatino/practica-4-todo.git"
+public_key     = "ssh-ed25519 REPLACE_WITH_PUBLIC_KEY"

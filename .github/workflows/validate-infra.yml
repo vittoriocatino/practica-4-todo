@@ -1,0 +1,32 @@
+name: Validate infrastructure
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.12.2'
+          terraform_wrapper: false
+      - run: terraform -chdir=terraform fmt -recursive
+      - run: terraform -chdir=terraform init -backend=false -input=false
+      - run: terraform -chdir=terraform validate
+      - run: terraform -chdir=terraform/bootstrap init -input=false
+      - run: terraform -chdir=terraform/bootstrap validate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: formatted-terraform
+          path: |
+            terraform/*.tf
+            terraform/bootstrap/*.tf
+            terraform/.terraform.lock.hcl
+            terraform/bootstrap/.terraform.lock.hcl

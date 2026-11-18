@@ -1,0 +1,28 @@
+name: Health check
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  AWS_DEFAULT_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+      - name: Discover current IP and validate database, version and timestamp
+        run: |
+          set -euo pipefail
+          HOST=$(aws ec2 describe-instances --filters Name=tag:Project,Values=practica4-todo Name=instance-state-name,Values=running --query 'Reservations[].Instances[].PublicIpAddress' --output text)
+          test -n "$HOST" && test "$HOST" != None
+          curl --fail --silent --show-error --max-time 20 "http://$HOST:8000/health" > health.json
+          python -c 'import json,datetime; d=json.load(open("health.json")); assert d["database"]=="OK"; assert d["version"]; datetime.datetime.fromisoformat(d["timestamp"]); print(d)'
+          cat health.json >> "$GITHUB_STEP_SUMMARY"
