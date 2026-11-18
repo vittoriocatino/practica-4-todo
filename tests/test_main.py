@@ -93,3 +93,9 @@ def test_success_emits_zero_error_and_latency(client):
     samples = client.app.state.metrics.samples
     assert ("DatabaseErrors", 0) in samples
     assert any(sample[0] == "DatabaseLatency" and sample[1] >= 0 for sample in samples)
+
+
+def test_title_whitespace_is_normalized(client):
+    response = client.post("/tasks", json={"title": "  Estudiar observabilidad  "})
+    assert response.status_code == 201
+    assert response.json()["title"] == "Estudiar observabilidad"
