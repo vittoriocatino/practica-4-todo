@@ -22,20 +22,20 @@ W, H = letter
 LEFT, RIGHT = 42, 570
 
 
-def paragraph(c, content, y, size=9.5, leading=13, color=INK, x=LEFT, width=528):
+def paragraph(c, content, y, size=10, leading=14, color=INK, x=LEFT, width=528):
     style = ParagraphStyle("body", fontName="Report", fontSize=size, leading=leading, textColor=color)
     p = Paragraph(content, style)
     _, h = p.wrap(width, 1000)
     p.drawOn(c, x, y - h)
-    return y - h - 8
+    return y - h - 13
 
 
-def header(c, title, page, total):
+def header(c, title, page, total, draft=False):
     c.setFillColor(NAVY)
     c.rect(0, H - 75, W, 75, fill=1, stroke=0)
     c.setFillColor(colors.white)
     c.setFont("ReportBold", 18)
-    c.drawString(LEFT, H - 33, title)
+    c.drawString(LEFT, H - 33, ("BORRADOR: " if draft else "") + title)
     c.setFont("Report", 8.4)
     c.drawString(LEFT, H - 52, "Vittorio Catino | Desarrollo en la Nube | 18 de noviembre de 2026")
     c.setStrokeColor(colors.HexColor("#D4E2E9"))
@@ -50,7 +50,7 @@ def heading(c, text, y):
     c.setFillColor(BLUE)
     c.setFont("ReportBold", 11)
     c.drawString(LEFT, y, text)
-    return y - 9
+    return y - 12
 
 
 def box(c, x, y, w, h, title, subtitle):
@@ -89,24 +89,31 @@ def architecture(c, top):
     return top - 128
 
 
-def main():
+def main(draft=False):
     manifest = json.loads((ROOT / "evidence/manifest.json").read_text())
     required = ["provision", "destroy", "ci", "release", "deploy", "health", "sns_confirmed", "real_outage"]
-    if not all(manifest.get(key) for key in required):
+    if not draft and not all(manifest.get(key) for key in required):
         raise RuntimeError("Refuse final report: required cloud verification is incomplete")
     annexes = manifest["screenshots"]
+    if draft:
+        annexes = [annex for annex in annexes if (ROOT / annex["file"]).is_file()]
     for annex in annexes:
         if not (ROOT / annex["file"]).is_file():
             raise FileNotFoundError(annex["file"])
+        if not draft:
+            for panel in annex.get("panels", []):
+                if not (ROOT / panel["file"]).is_file():
+                    raise FileNotFoundError(panel["file"])
     pdfmetrics.registerFont(TTFont("Report", "/System/Library/Fonts/Supplemental/Arial.ttf"))
     pdfmetrics.registerFont(TTFont("ReportBold", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"))
     pdfmetrics.registerFontFamily("Report", normal="Report", bold="ReportBold")
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    c = canvas.Canvas(str(OUT), pagesize=letter)
+    destination = ROOT / "tmp/pdfs/layout-draft.pdf" if draft else OUT
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(destination), pagesize=letter)
     c.setTitle("Práctica 4 - To-Do List - Vittorio Catino")
     c.setAuthor("Vittorio Catino")
     total = 2 + len(annexes)
-    header(c, "Práctica 4: To-Do List", 1, total)
+    header(c, "Práctica 4: To-Do List", 1, total, draft)
     y = heading(c, "Proyecto y arquitectura", H - 98)
     y = paragraph(c, "Se implementó una API FastAPI con persistencia en RDS MySQL y cuatro endpoints: <b>GET /tasks</b>, <b>POST /tasks</b>, <b>GET /version</b> y <b>GET /health</b>. Terraform administra EC2, Security Groups, Key Pair, RDS, secreto, SNS, alarmas y dashboard. El estado remoto reside en S3 privado, cifrado y versionado, con bloqueo nativo. EC2 lee las credenciales de RDS desde Secrets Manager en tiempo de ejecución usando LabInstanceProfile; no se guardan contraseñas en código ni en el entorno de la app.", y)
     y = architecture(c, y - 2)
@@ -118,7 +125,7 @@ def main():
     if y < 48:
         raise RuntimeError(f"Report page 1 overflow: {y}")
     c.showPage()
-    header(c, "Reflexión y observabilidad", 2, total)
+    header(c, "Reflexión y observabilidad", 2, total, draft)
     y = heading(c, "2. Pasos manuales eliminados y riesgos que evitó el pipeline", H - 98)
     y = paragraph(c, "El pipeline automatizó instalar dependencias para probar, ejecutar la suite, empaquetar el commit etiquetado, publicar el release, descargarlo en EC2, reiniciar el servicio y verificar qué versión quedó corriendo. Antes, repetir esos pasos manualmente podía producir un ZIP de otra rama, omitir una prueba, copiar archivos incompletos o reiniciar con una configuración equivocada. El artefacto del release y su hash permiten comprobar qué se despliega; la protección de main evita integrar pruebas fallidas y /version detecta una versión inesperada. El cambio de directorio mediante symlink reduce la ventana de actualización y el despliegue vuelve a la versión anterior si la comprobación de salud falla. Las credenciales temporales del lab deben renovarse al expirar; eso no se automatiza con claves permanentes.", y)
     y = heading(c, "Métricas, umbrales y acciones esperadas", y - 2)
@@ -137,18 +144,29 @@ def main():
         raise RuntimeError(f"Report page 2 overflow: {y}")
     c.showPage()
     for i, annex in enumerate(annexes, start=3):
-        header(c, annex["title"], i, total)
-        image_path = ROOT / annex["file"]
-        with Image.open(image_path) as img:
-            iw, ih = img.size
-        scale = min(528 / iw, 550 / ih)
-        pw, ph = iw * scale, ih * scale
-        c.drawImage(str(image_path), LEFT + (528 - pw) / 2, H - 105 - ph, width=pw, height=ph)
-        paragraph(c, annex["caption"], H - 123 - ph, size=9, leading=12)
+        header(c, annex["title"], i, total, draft)
+        panels = annex.get("panels", [annex])
+        if draft:
+            panels = [panel for panel in panels if (ROOT / panel["file"]).is_file()]
+        top = H - 105
+        max_image_height = 550 if len(panels) == 1 else 160
+        for panel in panels:
+            image_path = ROOT / panel["file"]
+            with Image.open(image_path) as img:
+                iw, ih = img.size
+            scale = min(528 / iw, max_image_height / ih)
+            pw, ph = iw * scale, ih * scale
+            c.drawImage(str(image_path), LEFT + (528 - pw) / 2, top - ph, width=pw, height=ph)
+            top = paragraph(c, panel["caption"], top - ph - 12, size=8.6, leading=11.3)
+        if top < 45:
+            raise RuntimeError(f"Annex overflow: {annex['title']}")
         c.showPage()
     c.save()
-    print(OUT)
+    print(destination)
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--draft", action="store_true")
+    main(parser.parse_args().draft)

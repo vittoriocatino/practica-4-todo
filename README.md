@@ -205,4 +205,11 @@ GitHub Actions para que la rúbrica tenga una ejecución exitosa verificable.
 - https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Alarms.html
 
 Se utilizó Codex como apoyo para implementar, revisar y documentar la práctica.
-Las ejecuciones y capturas deben corresponder al entorno real, no a simulaciones.
+Las ejecuciones y capturas del reporte corresponden al entorno real.
+
+El registro de verificaciones y enlaces a las ejecuciones está en
+[`docs/verification.md`](docs/verification.md). Para regenerar el reporte en macOS,
+instalar `reportlab` y `Pillow`, conservar las capturas y el manifiesto local en
+`evidence/` y ejecutar `python docs/build_report.py`. El generador final verifica
+que estén completas las validaciones y capturas antes de producir el PDF; existe
+`--draft` para revisar la maquetación con marca de borrador.
