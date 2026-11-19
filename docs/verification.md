@@ -13,7 +13,7 @@ Este registro enlaza ejecuciones reales; no sustituye las capturas del reporte.
 | Deploy SSM: checksum correcto y /version v1.0.0 | [Deploy](https://github.com/vittoriocatino/practica-4-todo/actions/runs/44422992734) |
 | /health: RDS OK, versión y timestamp | [Health check](https://github.com/vittoriocatino/practica-4-todo/actions/runs/44423511976) |
 | Caída real de RDS y recuperación: alarma ALARM y luego /health OK | [Validación exitosa](https://github.com/vittoriocatino/practica-4-todo/actions/runs/44423705652) |
-| Destrucción de recursos de la aplicación | [Destroy](https://github.com/vittoriocatino/practica-4-todo/actions/runs/44425106823) |
+| Destrucción completada y estado de aplicación vacío | [Destroy exitoso](https://github.com/vittoriocatino/practica-4-todo/actions/runs/44425106823) |
 
 El estado remoto se verificó en
 `s3://vittorio-practica4-state-912612781510/practica4/terraform.tfstate`.
@@ -29,4 +29,6 @@ El usuario confirmó la suscripción SNS de `vittorio.catino@iteso.mx`. Las capt
 reales se conservan localmente en `evidence/`, fuera de Git. El reporte se genera
 en `output/pdf/practica-4-todo-vittorio-catino.pdf`: dos páginas de contenido y
 anexos separados. La limpieza final se verifica con el estado de Terraform vacío;
-el bucket de estado se conserva intencionalmente.
+el bucket de estado se conserva intencionalmente. Destroy terminó correctamente:
+EC2 y RDS se eliminaron y el secreto quedó programado para borrado recuperable en
+siete días. La API ya no está activa tras la limpieza autorizada.
